@@ -1,0 +1,52 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "scaling-laws-demo"
+version = "0.1.0"
+description = "A self-contained demo of three compute-optimal scaling-law extraction methods on a teacher-student MLP."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "torch>=2.2",
+    "lightning>=2.2",
+    "numpy>=1.24",
+    "scipy>=1.10",
+    "pandas>=2.0",
+    "matplotlib>=3.7",
+    "mplhep>=0.3",       # ATLAS plot style
+    "tqdm>=4.60",        # progress bars in the training scripts
+]
+
+[project.optional-dependencies]
+notebook = ["jupyter>=1.0", "nbconvert", "ipython"]
+
+[tool.setuptools]
+packages = ["scaling_laws"]
+
+# --------------------------------------------------------------------------- #
+# pixi: reproducible, cross-platform environments (https://pixi.sh).
+#   pixi install            build the env (conda-forge python + this package,
+#                           installed editable with all deps via pip)
+#   pixi run notebooks      execute both notebooks
+#   pixi run sweep          retrain the (N, D) grid   (see [tool.pixi.tasks])
+# --------------------------------------------------------------------------- #
+[tool.pixi.workspace]
+channels = ["conda-forge"]
+platforms = ["osx-arm64", "osx-64", "linux-64"]
+
+[tool.pixi.dependencies]
+python = "3.11.*"
+
+[tool.pixi.pypi-dependencies]
+scaling-laws-demo = { path = ".", editable = true, extras = ["notebook"] }
+
+[tool.pixi.tasks]
+notebooks = "jupyter nbconvert --to notebook --execute --inplace notebooks/01_scaling_laws.ipynb notebooks/02_double_descent.ipynb"
+hp-study = "python scripts/run_hp_study.py"
+sweep = "python scripts/run_sweep.py"
+isoflop = "python scripts/run_isoflop.py"
+lr-ablation = "python scripts/run_lr_ablation.py"
+depth-compare = "python scripts/run_depth_compare.py"
+double-descent = "python scripts/run_double_descent.py"

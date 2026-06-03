@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+.DS_Store
+.venv/
+venv/
+.pixi/
+*.egg-info/
+
+# Large reference PDFs at the repo root are kept local, not tracked.
+/*.pdf
