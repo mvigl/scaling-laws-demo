@@ -369,3 +369,90 @@ def plot_dd_phase(df: pd.DataFrame, sigma: float = 0.4, n_hidden: int = 2, input
         ax.grid(False); fig.colorbar(im, ax=ax, label=clabel)
     fig.tight_layout()
     return fig
+
+
+def plot_frontier_regimes(env: EnvelopeResult, par: ParametricResult,
+                          irreducible: float | None = None):
+    """Anatomy of the compute-optimal frontier L*(C): three regimes, and why a single
+    fit to L(C) is unreliable.
+
+    On the lower-envelope L*(C) we overlay four fits, each in a fixed compute window
+    (shaded), with dashed continuations past the last data point:
+      * fast descent (orange, C<1e9) -- an E=0 power law. Here L >> E, so it reads the
+        *true* (steep) reducible exponent.
+      * scaling (blue, 1e9-1e13)     -- an E=0 power law whose *apparent* exponent is
+        already shallower; the floor is starting to bite.
+      * saturation tail (red, C>=5e12) -- a free-E fit E + A*C^g; only this near-floor
+        window lets the free E land on the true irreducible loss.
+      * Approach 3 (green) -- the parametric L(N,D) projected to the frontier. It tracks
+        all three regimes here, but that is the easy case (clean task, known floor).
+
+    Extrapolated (dashed), the E=0 laws shoot through the floor and the windowed
+    exponents disagree ~3x -- the point of the figure.
+    """
+    from scipy.optimize import curve_fit
+    fr = env.frontier.sort_values("C")
+    C = fr["C"].values.astype(float); L = fr["val_loss"].values.astype(float)
+    Cmax = float(C.max()); top = Cmax * 15
+    geo = np.geomspace
+    f1 = lambda x, E, A, g: E + A * np.power(x, g)
+
+    tail = C >= 5e12                                    # free-E fit on the saturated tail
+    (E1, A1, g1), _ = curve_fit(f1, C[tail] / 5e12, L[tail],
+        p0=[L[tail].min(), L[tail][0] - L[tail].min(), -0.1],
+        bounds=([0, 0, -2], [1, 1e3, 0]), maxfev=20000)
+    f1v = lambda c: f1(c / 5e12, E1, A1, g1)
+
+    def powerlaw(lo, hi):                               # E=0 power law fit in [lo, hi]
+        m = (C >= lo) & (C <= hi)
+        g, b = np.polyfit(np.log10(C[m]), np.log10(L[m]), 1)
+        return (lambda c: 10 ** b * np.power(c, g)), g
+    f2, g2 = powerlaw(1e9, 1e13)                        # scaling window
+    f3, g3 = powerlaw(1e6, 1e9)                         # fast-descent window
+
+    fig, ax = plt.subplots(figsize=(7.6, 5))
+    ax.axvspan(1e6, 1e9, color="tab:orange", alpha=0.07)
+    ax.axvspan(1e9, 1e13, color="tab:blue", alpha=0.07)
+    ax.axvspan(5e12, Cmax, color="red", alpha=0.06)
+    ax.plot(C, L, "o-", color="0.35", ms=4, lw=1, zorder=7, label=r"envelope  $L^*(C)$")
+    if irreducible is not None:
+        ax.axhline(irreducible, ls=":", c="k", lw=1, label=f"irreducible  E={irreducible:g}")
+    ax.axvline(Cmax, color="0.6", lw=1, ls=(0, (1, 2)))
+
+    ax.plot(geo(1e6, 1e9, 200), f3(geo(1e6, 1e9, 200)), "-", color="tab:orange", lw=2,
+            label=rf"fast descent  $A\,C^{{\gamma}}$ ($\gamma$={g3:.2f})")
+    ax.plot(geo(1e9, top, 200), f3(geo(1e9, top, 200)), "--", color="tab:orange", lw=2)
+    ax.plot(geo(1e9, 1e13, 200), f2(geo(1e9, 1e13, 200)), "-", color="tab:blue", lw=2,
+            label=rf"scaling  $A\,C^{{\gamma}}$ ($\gamma$={g2:.2f})")
+    ax.plot(geo(1e6, 1e9, 200), f2(geo(1e6, 1e9, 200)), "--", color="tab:blue", lw=2)
+    ax.plot(geo(1e13, top, 200), f2(geo(1e13, top, 200)), "--", color="tab:blue", lw=2)
+    ax.plot(geo(5e12, Cmax, 200), f1v(geo(5e12, Cmax, 200)), "-", color="red", lw=2, zorder=5,
+            label=rf"tail $E+A\,C^{{\gamma}}$ ($\gamma$={g1:.2f}, E={E1:.4f})")
+    ax.plot(geo(Cmax, top, 200), f1v(geo(Cmax, top, 200)), "--", color="red", lw=2, zorder=5)
+    cp = geo(C.min(), top, 300)
+    ax.plot(cp, par.L_star(cp), "--", color="tab:green", lw=1.8, alpha=0.55,
+            label=rf"Approach 3 $L^*(C)$ (E={par.E:.4f})")
+
+    ax.set(xscale="log", yscale="log", xlabel=r"compute $C=(6N-2dw)D$  (FLOPs)",
+           ylabel="validation loss", xlim=(1e6, top)); ax.set_ylim(7e-3, 1.1)
+    ax.legend(frameon=False, fontsize=8, loc="upper right")
+    fig.tight_layout()
+    return fig
+
+
+def plot_lr_tuning(lrs, losses, eta_star):
+    """L1 figure: validation loss vs learning rate at one cell, with the parabola fit
+    (in log10(LR)) and its vertex eta*."""
+    lrs = np.asarray(lrs, dtype=float)
+    x = np.log10(lrs)
+    a, b, c = np.polyfit(x, losses, 2)
+    xg = np.linspace(x.min(), x.max(), 100)
+    fig, ax = plt.subplots(figsize=(6, 4.2))
+    ax.plot(10 ** xg, a * xg ** 2 + b * xg + c, "-", color="0.6", lw=1.5, label="parabola fit")
+    ax.plot(lrs, losses, "o", color="steelblue", ms=7, label="measured")
+    ax.axvline(eta_star, ls="--", color="crimson", lw=1.5,
+               label=rf"$\eta^\star={eta_star:.4f}$")
+    ax.set(xscale="log", xlabel=r"learning rate $\eta$", ylabel="validation loss")
+    ax.legend(frameon=False)
+    fig.tight_layout()
+    return fig

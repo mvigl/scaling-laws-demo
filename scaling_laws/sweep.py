@@ -29,6 +29,7 @@ logging.getLogger("lightning.pytorch.utilities.rank_zero").setLevel(logging.ERRO
 logging.getLogger("lightning.fabric.utilities.seed").setLevel(logging.ERROR)
 warnings.filterwarnings("ignore", ".*does not have many workers.*")
 warnings.filterwarnings("ignore", ".*GPU available but not used.*")
+warnings.filterwarnings("ignore", ".*LeafSpec.*")            # lightning pytree deprecation noise
 
 
 def transfer_lr(eta_ref: float, w_ref: float, T_ref: float, c_w: float, c_T: float,

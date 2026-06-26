@@ -43,7 +43,7 @@ python = "3.11.*"
 scaling-laws-demo = { path = ".", editable = true, extras = ["notebook"] }
 
 [tool.pixi.tasks]
-notebooks = "jupyter nbconvert --to notebook --execute --inplace notebooks/01_scaling_laws.ipynb notebooks/02_double_descent.ipynb"
+notebooks = "jupyter nbconvert --to notebook --execute --inplace notebooks/00_single_cell.ipynb notebooks/01_tune_one_cell.ipynb notebooks/02_hp_transfer_law.ipynb notebooks/03_scaling_analysis.ipynb notebooks/04_double_descent.ipynb"
 hp-study = "python scripts/run_hp_study.py"
 sweep = "python scripts/run_sweep.py"
 isoflop = "python scripts/run_isoflop.py"
