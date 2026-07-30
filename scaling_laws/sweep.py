@@ -57,7 +57,8 @@ def run_cell(problem: TeacherStudentRegression, width: int, n_data: int, *,
     total_steps = problem.n_steps(n_data, bs)
 
     L.seed_everything(seed)
-    model = LitMLP(problem.input_dim, width, n_hidden, output_dim=1, lr=lr,
+    model = LitMLP(problem.input_dim, width, n_hidden,
+                   output_dim=getattr(problem, "output_dim", 1), lr=lr,
                    weight_decay=weight_decay, total_steps=total_steps)
     n_params = model.n_params
 

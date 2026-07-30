@@ -8,6 +8,6 @@ import warnings
 # lightning -- so it is silenced for every entry point (scripts and notebooks alike).
 warnings.filterwarnings("ignore", ".*LeafSpec.*")
 
-from . import flops, models, data, sweep, hp, live, approaches, plotting  # noqa: F401,E402
+from . import flops, models, data, flow, sweep, hp, live, approaches, plotting  # noqa: F401,E402
 
-__all__ = ["flops", "models", "data", "sweep", "hp", "live", "approaches", "plotting"]
+__all__ = ["flops", "models", "data", "flow", "sweep", "hp", "live", "approaches", "plotting"]

@@ -20,18 +20,19 @@ from .models import make_mlp, cosine_lr_lambda
 
 
 def train_cell_live(problem, width, n_data, lr, *, n_hidden=2, batch_size=256, seed=0,
-                    weight_decay=0.0, plot=True, progress=True):
+                    weight_decay=0.0, plot=True, progress=True, return_model=False):
     """Train one cell, live; return ``(val_loss, steps, train_losses)``.
 
     Same recipe as :func:`sweep.run_cell`, written as an explicit single-pass loop. With
     ``plot=True`` a loss curve updates in place as training proceeds; ``progress=True``
     prints a per-step tqdm bar. Set both ``False`` to train quietly (used by the overlay
-    helpers below).
+    helpers below). ``return_model=True`` appends the trained model to the return tuple
+    (used by the flow-matching notebook, which samples from trained fields).
     """
     bs = min(batch_size, n_data)
     total_steps = problem.n_steps(n_data, bs)
     torch.manual_seed(seed)
-    model = make_mlp(problem.input_dim, width, n_hidden, 1)
+    model = make_mlp(problem.input_dim, width, n_hidden, getattr(problem, "output_dim", 1))
     opt = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
     sched = torch.optim.lr_scheduler.LambdaLR(opt, cosine_lr_lambda(total_steps))
     loader = problem.train_loader(n_data, bs, seed=seed * 100003 + width)
@@ -48,10 +49,12 @@ def train_cell_live(problem, width, n_data, lr, *, n_hidden=2, batch_size=256, s
     def redraw():
         ax.clear()
         ax.plot(steps, losses, color="steelblue", lw=1.2)
-        ax.axhline(problem.irreducible_loss, ls=":", c="k", lw=1,
-                   label=rf"floor $E={problem.irreducible_loss:g}$")
+        if problem.irreducible_loss is not None:
+            ax.axhline(problem.irreducible_loss, ls=":", c="k", lw=1,
+                       label=rf"floor $E={problem.irreducible_loss:g}$")
+            ax.legend(frameon=False)
         ax.set(xlabel="optimiser step", ylabel="training loss (MSE)", yscale="log")
-        ax.legend(frameon=False); fig.tight_layout(); handle.update(fig)
+        fig.tight_layout(); handle.update(fig)
 
     step = 0
     loader_it = (tqdm(loader, total=total_steps, desc=f"w={width}, D={n_data:,}", unit="step")
@@ -74,6 +77,8 @@ def train_cell_live(problem, width, n_data, lr, *, n_hidden=2, batch_size=256, s
         redraw()
         import matplotlib.pyplot as plt
         plt.close(fig)
+    if return_model:
+        return val_loss, steps, losses, model
     return val_loss, steps, losses
 
 
@@ -88,8 +93,9 @@ def train_cells_live(problem, cells, lr=0.005, *, n_hidden=2, batch_size=256, se
 
     colors = plt.get_cmap("tab10")
     fig, ax = plt.subplots(figsize=(8.2, 4.3))
-    ax.axhline(problem.irreducible_loss, ls=":", c="k", lw=1,
-               label=rf"floor $E={problem.irreducible_loss:g}$")
+    if problem.irreducible_loss is not None:
+        ax.axhline(problem.irreducible_loss, ls=":", c="k", lw=1,
+                   label=rf"floor $E={problem.irreducible_loss:g}$")
     ax.set(xscale="log", yscale="log", xlabel="optimiser step", ylabel="training loss (MSE)")
     handle = display(fig, display_id=True)
 
@@ -127,10 +133,11 @@ def sweep_lr_live(problem, width, n_data, lrs, *, n_hidden=2, batch_size=256, se
     lrs = np.asarray(lrs, dtype=float)
     cmap, norm = cm.viridis, mcolors.LogNorm(lrs.min(), lrs.max())
     fig, ax = plt.subplots(figsize=(6.8, 4.2))
-    ax.axhline(problem.irreducible_loss, ls=":", c="k", lw=1,
-               label=rf"floor $E={problem.irreducible_loss:g}$")
+    if problem.irreducible_loss is not None:
+        ax.axhline(problem.irreducible_loss, ls=":", c="k", lw=1,
+                   label=rf"floor $E={problem.irreducible_loss:g}$")
+        ax.legend(frameon=False)
     ax.set(yscale="log", xlabel="optimiser step", ylabel="training loss (MSE)")
-    ax.legend(frameon=False)
     fig.colorbar(cm.ScalarMappable(norm=norm, cmap=cmap), ax=ax, label=r"learning rate $\eta$")
     handle = display(fig, display_id=True)
 

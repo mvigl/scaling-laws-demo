@@ -28,8 +28,12 @@ each one wrapping the previous:
 | [`02_hp_transfer_law`](notebooks/02_hp_transfer_law.ipynb) | the HP law | how `η*` scales: `η*(w,T) = η_ref·(w/w_ref)^cᵂ·(T/T_ref)^cᵀ` | loads study |
 | [`03_scaling_analysis`](notebooks/03_scaling_analysis.ipynb) | the full sweep | the `(N,D)` grid (LR per cell from the law) → the frontier, three ways | loads grid |
 | [`04_double_descent`](notebooks/04_double_descent.ipynb) | a different regime | repeat a *limited* dataset → double descent | loads grids |
+| [`05_flow_matching`](notebooks/05_flow_matching.ipynb) | a generative problem | the same recipe on flow matching: Gaussian → two moons | live + grid |
+| [`06_flow_matching_hard`](notebooks/06_flow_matching_hard.ipynb) | a harder flow | four moon-pairs entangled in $R^8$: the scaling regime stretches | live + grid |
+| [`07_flow_matching_hierarchical`](notebooks/07_flow_matching_hierarchical.ipynb) | a two-scale flow | hierarchical moons: fine structure resolves late in the scaling curve | live + grid |
+| [`08_flow_matching_32d`](notebooks/08_flow_matching_32d.ipynb) | the hardest flow | sixteen two-scale pairs in $R^{32}$: capacity stays active into the million-parameter range | live + grid |
 
-The two cheap layers run live; the rest load grids precomputed by the scripts. The loops
+The cheap layers run live; the rest load grids precomputed by the scripts. The loops
 themselves live in the package: `sweep.run_cell` (L0), `hp.tune_lr_cell` (L1),
 `hp.fit_transfer_law` (L2), `sweep.run_grid` (L3), `approaches.*` (L4).
 
@@ -82,7 +86,7 @@ Or with [pixi](https://pixi.sh):
 
 ```bash
 pixi install          # build the env from pyproject.toml
-pixi run notebooks    # execute all five notebooks (00 -> 04)
+pixi run notebooks    # execute all the notebooks (00 -> 05)
 ```
 
 <details>
@@ -140,6 +144,69 @@ A second notebook reproduces all three classic double descents
 
 ![phase diagram](results/figures/double_descent_phase.png)
 
+### Flow matching
+
+The same pipeline runs on a generative problem: a velocity field trained by conditional flow
+matching ([Lipman et al., 2023](https://arxiv.org/abs/2210.02747)) to transport a 2D Gaussian
+into the two-moons distribution. The CFM objective is MSE regression whose irreducible floor is
+the conditional variance of the target velocity, unknown a priori: it must be estimated or
+fitted, and small excess-loss differences separate a blob from crisp moons.
+
+![flow](results/figures/flow_one_field.png)
+
+A trained field, integrated from $t=0$ to $1$ (grey: the target moons):
+
+![flow morph](results/figures/flow_morph.gif)
+
+```bash
+python scripts/run_flow_hp_study.py    # calibrate the LR law for this problem
+python scripts/run_flow_sweep.py       # train the (N,D) grid -> results/flow_sweep_cosine.csv
+```
+
+The 2D problem saturates by width 64, so a second, harder variant stacks **four moon-pairs
+into eight dimensions** and mixes them with a fixed random rotation. The joint target is
+entangled across all coordinates, the velocity field has to model all four planes at once, and
+the scaling regime stretches to much larger models. Generated samples are rotated back onto
+the moon planes for inspection:
+
+![flow8](results/figures/flow8_one_field.png)
+
+![flow8 morph](results/figures/flow8_morph.gif)
+
+```bash
+python scripts/run_flow_hp_study.py --hard   # re-calibrate the LR law in 8D
+python scripts/run_flow_sweep.py --hard      # train the 8D grid -> results/flow8_sweep_cosine.csv
+```
+
+A third variant keeps the entangled 8D setup but makes every plane **two-scale**: each arc
+is convolved with a miniature two-moons, so its cross-section carries structure fifteen times
+smaller than the arc itself. Coarse and fine structure resolve at different points of the
+scaling curve (top: plane 1 across a model/data ladder; bottom: the same samples zoomed onto
+one arc):
+
+![flowh ladder](results/figures/flowh_generation_ladder.png)
+
+![flowh morph](results/figures/flowh_morph.gif)
+
+```bash
+python scripts/run_flow_hp_study.py --hier   # calibrate on an extended range (w to 384, T to 16k)
+python scripts/run_flow_sweep.py --hier      # train the two-scale grid -> results/flowh_sweep_cosine.csv
+```
+
+The hardest variant packs **sixteen** two-scale pairs into $R^{32}$. Ambient dimension alone
+does not create difficulty (a rotation is linear); what matters is that every extra plane adds
+structure the field must encode, so the capacity term stays active into the million-parameter range
+and the models finally stop being small. Plane 1 across a model/data ladder (top: full view,
+bottom: zoom on one arc), then four of the sixteen planes flowing:
+
+![flow32 ladder](results/figures/flow32_generation_ladder.png)
+
+![flow32 morph](results/figures/flow32_morph.gif)
+
+```bash
+python scripts/run_flow_hp_study.py --dim32  # calibrate out to w=512, T=32768
+python scripts/run_flow_sweep.py --dim32     # train the hardest grid -> results/flow32_sweep_cosine.csv
+```
 
 ## References
 
@@ -148,3 +215,6 @@ Hoffmann, Borgeaud, Mensch et al., *Training Compute-Optimal Large Language Mode
 
 Nakkiran, Kaplun, Bansal, Yang, Barak, Sutskever, *Deep Double Descent: Where Bigger
 Models and More Data Hurt* (2019), [arXiv:1912.02292](https://arxiv.org/abs/1912.02292)
+
+Lipman, Chen, Ben-Hamu, Nickel, Le, *Flow Matching for Generative Modeling* (2023),
+[arXiv:2210.02747](https://arxiv.org/abs/2210.02747)
