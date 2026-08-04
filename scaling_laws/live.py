@@ -48,8 +48,8 @@ def train_cell_live(problem, width, n_data, lr, *, n_hidden=2, batch_size=256, s
     def redraw():
         ax.clear()
         ax.plot(steps, losses, color="steelblue", lw=1.2)
-        ax.axhline(problem.irreducible_loss, ls=":", c="k", lw=1,
-                   label=rf"floor $E={problem.irreducible_loss:g}$")
+        ax.axhline(problem.irreducible_loss, ls="--", c="0.25", lw=1.3,
+                   label=r"irreducible floor $E$")
         ax.set(xlabel="optimiser step", ylabel="training loss (MSE)", yscale="log")
         ax.legend(frameon=False); fig.tight_layout(); handle.update(fig)
 
@@ -88,8 +88,8 @@ def train_cells_live(problem, cells, lr=0.005, *, n_hidden=2, batch_size=256, se
 
     colors = plt.get_cmap("tab10")
     fig, ax = plt.subplots(figsize=(8.2, 4.3))
-    ax.axhline(problem.irreducible_loss, ls=":", c="k", lw=1,
-               label=rf"floor $E={problem.irreducible_loss:g}$")
+    ax.axhline(problem.irreducible_loss, ls="--", c="0.25", lw=1.3,
+               label=r"irreducible floor $E$")
     ax.set(xscale="log", yscale="log", xlabel="optimiser step", ylabel="training loss (MSE)")
     handle = display(fig, display_id=True)
 
@@ -127,8 +127,8 @@ def sweep_lr_live(problem, width, n_data, lrs, *, n_hidden=2, batch_size=256, se
     lrs = np.asarray(lrs, dtype=float)
     cmap, norm = cm.viridis, mcolors.LogNorm(lrs.min(), lrs.max())
     fig, ax = plt.subplots(figsize=(6.8, 4.2))
-    ax.axhline(problem.irreducible_loss, ls=":", c="k", lw=1,
-               label=rf"floor $E={problem.irreducible_loss:g}$")
+    ax.axhline(problem.irreducible_loss, ls="--", c="0.25", lw=1.3,
+               label=r"irreducible floor $E$")
     ax.set(yscale="log", xlabel="optimiser step", ylabel="training loss (MSE)")
     ax.legend(frameon=False)
     fig.colorbar(cm.ScalarMappable(norm=norm, cmap=cmap), ax=ax, label=r"learning rate $\eta$")
@@ -200,11 +200,11 @@ def measure_law_live(problem, *, widths, Tsteps, w_ref, T_ref, batch_size=256, l
 
     law = fit_law_from_points(widths, eW, Tsteps, eT, w_ref, T_ref)
     ww = np.geomspace(min(widths), max(widths), 50)
-    axW.plot(ww, law["eta_ref"] * (ww / w_ref) ** law["c_w"], "--", color="navy",
-             label=rf"$\eta^\star\!\propto w^{{{law['c_w']}}}$")
+    axW.plot(ww, law["eta_ref"] * (ww / w_ref) ** law["c_w"], "--", color="red", lw=1.8,
+             label="power-law fit")
     tt = np.geomspace(min(Tsteps), max(Tsteps), 50)
-    axT.plot(tt, law["eta_ref"] * (tt / T_ref) ** law["c_T"], "--", color="seagreen",
-             label=rf"$\eta^\star\!\propto T^{{{law['c_T']}}}$")
+    axT.plot(tt, law["eta_ref"] * (tt / T_ref) ** law["c_T"], "--", color="red", lw=1.8,
+             label="power-law fit")
     axW.legend(frameon=False); axT.legend(frameon=False)
     fig.tight_layout(); handle.update(fig); plt.close(fig)
     return law
