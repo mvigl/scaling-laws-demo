@@ -6,7 +6,6 @@ import os
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 import matplotlib.colors as mcolors
-import mplhep as hep
 import numpy as np
 import pandas as pd
 
@@ -14,16 +13,25 @@ from .approaches import EnvelopeResult, IsoFlopResult, ParametricResult
 
 
 def set_style():
-    """The mplhep ATLAS style (boxed axes, inward major+minor ticks, Helvetica-like
-    font), lightly adapted for the repo's multi-panel log-log tutorial figures."""
-    hep.style.use("ATLAS")
+    """Paper style: clean boxed axes with inward ticks, no grid, no titles, large
+    axis labels, framed legends with qualitative entries only (no fitted numbers or
+    functional forms), and a plasma colormap for model size."""
+    plt.rcdefaults()
     plt.rcParams.update({
-        "figure.dpi": 120, "savefig.dpi": 120, "savefig.bbox": "tight",
-        "axes.titlesize": 14, "axes.labelsize": 14,
-        "xtick.labelsize": 12, "ytick.labelsize": 12,
-        "legend.fontsize": 11, "legend.frameon": False,
-        "axes.grid": True, "axes.axisbelow": True, "grid.alpha": 0.3,
-        "grid.linewidth": 0.6, "lines.markersize": 6,
+        "figure.dpi": 120, "savefig.dpi": 150, "savefig.bbox": "tight",
+        "font.size": 12, "axes.labelsize": 16, "axes.titlesize": 16,
+        "xtick.labelsize": 12.5, "ytick.labelsize": 12.5,
+        "axes.linewidth": 1.1,
+        "xtick.direction": "in", "ytick.direction": "in",
+        "xtick.top": True, "ytick.right": True,
+        "xtick.minor.visible": True, "ytick.minor.visible": True,
+        "xtick.major.size": 5.5, "ytick.major.size": 5.5,
+        "xtick.minor.size": 3.0, "ytick.minor.size": 3.0,
+        "legend.fontsize": 10.5, "legend.frameon": True,
+        "legend.edgecolor": "0.2", "legend.framealpha": 1.0,
+        "legend.fancybox": False,
+        "axes.grid": False,
+        "lines.linewidth": 1.6, "lines.markersize": 6,
         "figure.facecolor": "white", "axes.facecolor": "white",
     })
 
@@ -38,7 +46,7 @@ def save_figure(fig, name: str, outdir: str = "results/figures"):
 
 def _N_colormap(agg):
     norm = mcolors.LogNorm(vmin=agg["N"].min(), vmax=agg["N"].max())
-    return cm.viridis, norm
+    return cm.plasma, norm
 
 
 def plot_all_runs(agg: pd.DataFrame, irreducible: float | None = None):
@@ -53,17 +61,22 @@ def plot_all_runs(agg: pd.DataFrame, irreducible: float | None = None):
     for N, g in agg.groupby("N"):
         c = cmap(norm(N))
         gd = g.sort_values("D")
-        axes[0].plot(gd["D"], gd["val_loss"], "-o", ms=3, color=c, alpha=0.9)
+        axes[0].plot(gd["D"], gd["val_loss"], "-", lw=1.3, color=c, alpha=0.9)
+        axes[0].plot(gd["D"], gd["val_loss"], "o", ms=4.5, color=c,
+                     markeredgecolor="0.15", markeredgewidth=0.5)
         gc = g.sort_values("C")
-        axes[1].plot(gc["C"], gc["val_loss"], "-o", ms=3, color=c, alpha=0.9)
+        axes[1].plot(gc["C"], gc["val_loss"], "-", lw=1.3, color=c, alpha=0.9)
+        axes[1].plot(gc["C"], gc["val_loss"], "o", ms=4.5, color=c,
+                     markeredgecolor="0.15", markeredgewidth=0.5)
     for ax in axes:
         if irreducible is not None:
-            ax.axhline(irreducible, ls=":", c="k", lw=1, label=f"irreducible  E={irreducible:g}")
+            ax.axhline(irreducible, ls="--", c="0.25", lw=1.3,
+                       label=r"irreducible floor $E$")
         ax.set_xscale("log"); ax.set_yscale("log"); ax.set_ylabel("validation loss")
     axes[0].set_xlabel("data  $D$  (examples seen)")
     axes[1].set_xlabel(r"compute  $C=(6N-2dw)D$  (FLOPs)")
     if irreducible is not None:
-        axes[0].legend(frameon=False)
+        axes[0].legend()
     sm = cm.ScalarMappable(norm=norm, cmap=cmap); sm.set_array([])
     fig.colorbar(sm, ax=axes, label="N (params)")
     return fig
@@ -77,25 +90,24 @@ def plot_envelope(agg: pd.DataFrame, env: EnvelopeResult, irreducible: float | N
     for N, g in agg.groupby("N"):
         g = g.sort_values("C")
         ax.plot(g["C"], g["val_loss"], "-", color=cmap(norm(N)), alpha=0.4, lw=1)
-    ax.plot(env.frontier["C"], env.frontier["val_loss"], "o-", c="crimson",
-            label=r"compute-optimal frontier $L^\star(C)$")
+    ax.plot(env.frontier["C"], env.frontier["val_loss"], "o", c="crimson", ms=5,
+            markeredgecolor="0.15", markeredgewidth=0.5, label=r"$L^\star(C)$  (envelope)")
+    ax.plot(env.frontier["C"], env.frontier["val_loss"], "--", c="red", lw=1.8)
     if irreducible is not None:
-        ax.axhline(irreducible, ls=":", c="k", lw=1, label=f"known floor $E$={irreducible:g}")
+        ax.axhline(irreducible, ls="--", c="0.25", lw=1.3, label=r"irreducible floor $E$")
     ax.set_xscale("log"); ax.set_yscale("log")
-    ax.set_xlabel(r"$C=(6N-2dw)D$"); ax.set_ylabel("loss (MSE)"); ax.legend(frameon=False)
+    ax.set_xlabel(r"compute  $C$  (FLOPs)"); ax.set_ylabel("loss"); ax.legend()
 
     C = env.frontier["C"].values
     axes[1].plot(C, env.frontier["N"], "o", c="navy")
-    axes[1].plot(C, env.N_star(C), "--", c="navy",
-                 label=rf"$N^\star\!\propto C^{{{env.a_N:.3f}}}$")
+    axes[1].plot(C, env.N_star(C), "--", c="red", lw=1.8, label="power-law fit")
     axes[1].set_xscale("log"); axes[1].set_yscale("log")
-    axes[1].set_xlabel("C"); axes[1].set_ylabel(r"$N^\star$"); axes[1].legend(frameon=False)
+    axes[1].set_xlabel(r"compute  $C$  (FLOPs)"); axes[1].set_ylabel(r"$N^\star$"); axes[1].legend()
 
     axes[2].plot(C, env.frontier["D"], "o", c="seagreen")
-    axes[2].plot(C, env.D_star(C), "--", c="seagreen",
-                 label=rf"$D^\star\!\propto C^{{{env.a_D:.3f}}}$")
+    axes[2].plot(C, env.D_star(C), "--", c="red", lw=1.8, label="power-law fit")
     axes[2].set_xscale("log"); axes[2].set_yscale("log")
-    axes[2].set_xlabel("C"); axes[2].set_ylabel(r"$D^\star$"); axes[2].legend(frameon=False)
+    axes[2].set_xlabel(r"compute  $C$  (FLOPs)"); axes[2].set_ylabel(r"$D^\star$"); axes[2].legend()
     fig.tight_layout()
     return fig
 
@@ -104,34 +116,38 @@ def plot_isoflop(iso: IsoFlopResult):
     """Approach 2: iso-compute parabolas and the recovered allocation."""
     fig, axes = plt.subplots(1, 3, figsize=(16, 4.5))
     ax = axes[0]
-    colors = cm.plasma(np.linspace(0, 0.9, len(iso.profiles)))
-    for (C, prof), col in zip(sorted(iso.profiles.items()), colors):
-        ax.plot(prof["N"], prof["val_loss"], "o", color=col, ms=4)
+    Cs = sorted(iso.profiles)
+    cnorm = mcolors.LogNorm(vmin=min(Cs), vmax=max(Cs))
+    for C in Cs:
+        prof = iso.profiles[C]
+        col = cm.plasma(cnorm(C) * 0.9)
+        ax.plot(prof["N"], prof["val_loss"], "o", color=col, ms=4.5,
+                markeredgecolor="0.15", markeredgewidth=0.4)
         xs = np.log10(prof["N"].values)
         xg = np.linspace(xs.min(), xs.max(), 100)
         p2, p1, p0 = np.polyfit(xs, prof["val_loss"].values, 2)
-        ax.plot(10 ** xg, p0 + p1 * xg + p2 * xg ** 2, "-", color=col, lw=1,
-                label=f"C={C:.1e}")
+        ax.plot(10 ** xg, p0 + p1 * xg + p2 * xg ** 2, "-", color=col, lw=1.2)
         row = iso.minima[iso.minima["C"] == C]
         if len(row):
-            ax.plot(row["N_star"], row["loss_star"], "*", color=col, ms=14,
+            ax.plot(row["N_star"], row["loss_star"], "*", color=col, ms=15,
                     markeredgecolor="k")
+    ax.plot([], [], "k*", ms=11, markeredgecolor="k", label=r"minimum  $N^\star(C)$")
     ax.set_xscale("log")
-    ax.set_xlabel("N (params)"); ax.set_ylabel("loss")
-    ax.legend(frameon=False, fontsize=8)
+    ax.set_xlabel(r"$N$  (params)"); ax.set_ylabel("loss")
+    ax.legend()
+    sm = cm.ScalarMappable(norm=cnorm, cmap=cm.plasma); sm.set_array([])
+    fig.colorbar(sm, ax=ax, label=r"$C$  (FLOPs)")
 
     C = iso.minima["C"].values
     axes[1].plot(C, iso.minima["N_star"], "*", c="navy", ms=12)
-    axes[1].plot(C, iso.N_star(C), "--", c="navy",
-                 label=rf"$N^\star\!\propto C^{{{iso.a_N:.3f}}}$")
+    axes[1].plot(C, iso.N_star(C), "--", c="red", lw=1.8, label="power-law fit")
     axes[1].set_xscale("log"); axes[1].set_yscale("log")
-    axes[1].set_xlabel("C"); axes[1].set_ylabel(r"$N^\star$"); axes[1].legend(frameon=False)
+    axes[1].set_xlabel(r"compute  $C$  (FLOPs)"); axes[1].set_ylabel(r"$N^\star$"); axes[1].legend()
 
     axes[2].plot(C, iso.minima["D_star"], "*", c="seagreen", ms=12)
-    axes[2].plot(C, iso.D_star(C), "--", c="seagreen",
-                 label=rf"$D^\star\!\propto C^{{{iso.a_D:.3f}}}$")
+    axes[2].plot(C, iso.D_star(C), "--", c="red", lw=1.8, label="power-law fit")
     axes[2].set_xscale("log"); axes[2].set_yscale("log")
-    axes[2].set_xlabel("C"); axes[2].set_ylabel(r"$D^\star$"); axes[2].legend(frameon=False)
+    axes[2].set_xlabel(r"compute  $C$  (FLOPs)"); axes[2].set_ylabel(r"$D^\star$"); axes[2].legend()
     fig.tight_layout()
     return fig
 
@@ -175,13 +191,12 @@ def plot_comparison(env: EnvelopeResult, iso: IsoFlopResult, par: ParametricResu
     fig, axes = plt.subplots(1, 2, figsize=(13, 5))
     C = np.geomspace(*C_range, 100)
     ax = axes[0]
-    ax.plot(C, env.N_star(C), c="crimson", label=f"approach 1  (a={env.a_N:.3f})")
-    ax.plot(C, iso.N_star(C), c="navy", ls="--", label=f"approach 2  (a={iso.a_N:.3f})")
-    ax.plot(C, par.N_star(C), c="green", ls=":", lw=2,
-            label=f"approach 3  (a={par.a_N:.3f})")
+    ax.plot(C, env.N_star(C), c="crimson", lw=1.8, label="envelope")
+    ax.plot(C, iso.N_star(C), c="navy", ls="--", lw=1.8, label="iso-FLOP")
+    ax.plot(C, par.N_star(C), c="seagreen", ls=":", lw=2.2, label="parametric")
     ax.set_xscale("log"); ax.set_yscale("log")
-    ax.set_xlabel(r"$C=(6N-2dw)D$"); ax.set_ylabel(r"$N^\star(C)$")
-    ax.legend(frameon=False)
+    ax.set_xlabel(r"compute  $C$  (FLOPs)"); ax.set_ylabel(r"$N^\star(C)$")
+    ax.legend()
 
     ax2 = axes[1]; ax2.axis("off")
     rows = [["", "a_N  (N*~C^a)", "a_D  (D*~C^a)"],
@@ -229,15 +244,13 @@ def plot_hp_study(law: dict):
     c_w, b_w = np.polyfit(np.log(w), np.log(eW), 1)
     c_T, b_T = np.polyfit(np.log(T), np.log(eT), 1)
     fig, ax = plt.subplots(1, 2, figsize=(12, 4.7))
-    ax[0].plot(w, eW, "o", c="darkgreen")
-    ax[0].plot(w, np.exp(b_w) * w ** c_w, "--", c="darkgreen",
-               label=rf"$\eta^\star\propto w^{{{c_w:.2f}}}$")
-    ax[0].set(xscale="log", yscale="log", xlabel="width", ylabel=r"optimal $\eta^\star$")
+    ax[0].plot(w, eW, "o", c="darkgreen", ms=6.5, markeredgecolor="0.15", markeredgewidth=0.5)
+    ax[0].plot(w, np.exp(b_w) * w ** c_w, "--", c="red", lw=1.8, label="power-law fit")
+    ax[0].set(xscale="log", yscale="log", xlabel=r"width  $w$", ylabel=r"optimal LR  $\eta^\star$")
     ax[0].legend()
-    ax[1].plot(T, eT, "o", c="navy")
-    ax[1].plot(T, np.exp(b_T) * T ** c_T, "--", c="navy",
-               label=rf"$\eta^\star\propto T^{{{c_T:.2f}}}$")
-    ax[1].set(xscale="log", yscale="log", xlabel="steps T", ylabel=r"optimal $\eta^\star$")
+    ax[1].plot(T, eT, "o", c="navy", ms=6.5, markeredgecolor="0.15", markeredgewidth=0.5)
+    ax[1].plot(T, np.exp(b_T) * T ** c_T, "--", c="red", lw=1.8, label="power-law fit")
+    ax[1].set(xscale="log", yscale="log", xlabel=r"steps  $T$", ylabel=r"optimal LR  $\eta^\star$")
     ax[1].legend()
     fig.tight_layout()
     return fig
@@ -252,15 +265,15 @@ def plot_flop_validation(df: pd.DataFrame):
     fig, ax = plt.subplots(1, 2, figsize=(13, 5))
     ax[0].plot(df.N, df.measured, "o", color="crimson", ms=8, zorder=3,
                label="measured (FlopCounterMode)")
-    ax[0].plot(df.N, df.formula, "-", color="seagreen", label=r"closed form  $6N-2dw$")
-    ax[0].plot(df.N, df.naive, "--", color="0.55", label=r"naive  $6N$")
+    ax[0].plot(df.N, df.formula, "-", color="seagreen", label="closed form")
+    ax[0].plot(df.N, df.naive, "--", color="0.55", label="naive")
     ax[0].set(xscale="log", yscale="log", xlabel="N (params)",
               ylabel="training FLOPs / example")
     ax[0].legend()
     ax[1].axhline(1, ls=":", c="k", lw=1)
     ax[1].plot(df.N, df.measured / df.formula, "o-", color="seagreen",
-               label=r"measured / $(6N-2dw)$")
-    ax[1].plot(df.N, df.measured / df.naive, "s--", color="0.55", label=r"measured / $6N$")
+               label="measured / closed form")
+    ax[1].plot(df.N, df.measured / df.naive, "s--", color="0.55", label="measured / naive")
     ax[1].set(xscale="log", xlabel="N (params)", ylabel="measured / closed form")
     ax[1].legend()
     fig.tight_layout()
@@ -328,7 +341,7 @@ def plot_dd_epochs(df: pd.DataFrame, width: int, n_params: int, sigma: float = 0
     for D, c in zip(Ds, colors):
         g = df[df.D == D].groupby("step").agg(excess=("excess", "mean"),
                                               train=("train", "mean")).reset_index()
-        ax.plot(g.step, g.excess + s2, "-", color=c, label=f"D={D:,} ({D/n_params:.2f} N)")
+        ax.plot(g.step, g.excess + s2, "-", color=c, label=f"$D$ = {D:,}")
         ax.plot(g.step, g.train, "--", color=c, alpha=0.6)
         im = g.excess.idxmin()
         ax.plot(g.step[im], g.excess[im] + s2, "*", color=c, ms=16, markeredgecolor="k", zorder=5)
@@ -414,28 +427,29 @@ def plot_frontier_regimes(env: EnvelopeResult, par: ParametricResult,
     ax.axvspan(1e6, 1e9, color="tab:orange", alpha=0.07)
     ax.axvspan(1e9, 1e13, color="tab:blue", alpha=0.07)
     ax.axvspan(5e12, Cmax, color="red", alpha=0.06)
-    ax.plot(C, L, "o-", color="0.35", ms=4, lw=1, zorder=7, label=r"envelope  $L^*(C)$")
+    ax.plot(C, L, "o", color="0.3", ms=6.5, zorder=7,
+            markeredgecolor="0.15", markeredgewidth=0.6, label=r"envelope  $L^\star(C)$")
     if irreducible is not None:
-        ax.axhline(irreducible, ls=":", c="k", lw=1, label=f"irreducible  E={irreducible:g}")
+        ax.axhline(irreducible, ls="--", c="0.25", lw=1.3, label=r"irreducible floor $E$")
     ax.axvline(Cmax, color="0.6", lw=1, ls=(0, (1, 2)))
 
     ax.plot(geo(1e6, 1e9, 200), f3(geo(1e6, 1e9, 200)), "-", color="tab:orange", lw=2,
-            label=rf"fast descent  $A\,C^{{\gamma}}$ ($\gamma$={g3:.2f})")
+            label="power-law fit, fast descent")
     ax.plot(geo(1e9, top, 200), f3(geo(1e9, top, 200)), "--", color="tab:orange", lw=2)
     ax.plot(geo(1e9, 1e13, 200), f2(geo(1e9, 1e13, 200)), "-", color="tab:blue", lw=2,
-            label=rf"scaling  $A\,C^{{\gamma}}$ ($\gamma$={g2:.2f})")
+            label="power-law fit, scaling regime")
     ax.plot(geo(1e6, 1e9, 200), f2(geo(1e6, 1e9, 200)), "--", color="tab:blue", lw=2)
     ax.plot(geo(1e13, top, 200), f2(geo(1e13, top, 200)), "--", color="tab:blue", lw=2)
     ax.plot(geo(5e12, Cmax, 200), f1v(geo(5e12, Cmax, 200)), "-", color="red", lw=2, zorder=5,
-            label=rf"tail $E+A\,C^{{\gamma}}$ ($\gamma$={g1:.2f}, E={E1:.4f})")
+            label="power law + floor, saturation")
     ax.plot(geo(Cmax, top, 200), f1v(geo(Cmax, top, 200)), "--", color="red", lw=2, zorder=5)
     cp = geo(C.min(), top, 300)
     ax.plot(cp, par.L_star(cp), "--", color="tab:green", lw=1.8, alpha=0.55,
-            label=rf"Approach 3 $L^*(C)$ (E={par.E:.4f})")
+            label=r"$L(N,D)$ parametric fit (unreliable)")
 
-    ax.set(xscale="log", yscale="log", xlabel=r"compute $C=(6N-2dw)D$  (FLOPs)",
+    ax.set(xscale="log", yscale="log", xlabel=r"compute  $C$  (FLOPs)",
            ylabel="validation loss", xlim=(1e6, top)); ax.set_ylim(7e-3, 1.1)
-    ax.legend(frameon=False, fontsize=8, loc="upper right")
+    ax.legend(fontsize=9.5, loc="upper right")
     fig.tight_layout()
     return fig
 
@@ -449,10 +463,11 @@ def plot_lr_tuning(lrs, losses, eta_star):
     xg = np.linspace(x.min(), x.max(), 100)
     fig, ax = plt.subplots(figsize=(6, 4.2))
     ax.plot(10 ** xg, a * xg ** 2 + b * xg + c, "-", color="0.6", lw=1.5, label="parabola fit")
-    ax.plot(lrs, losses, "o", color="steelblue", ms=7, label="measured")
+    ax.plot(lrs, losses, "o", color="steelblue", ms=7,
+            markeredgecolor="0.15", markeredgewidth=0.5, label="measured")
     ax.axvline(eta_star, ls="--", color="crimson", lw=1.5,
-               label=rf"$\eta^\star={eta_star:.4f}$")
-    ax.set(xscale="log", xlabel=r"learning rate $\eta$", ylabel="validation loss")
-    ax.legend(frameon=False)
+               label=r"optimum  $\eta^\star$")
+    ax.set(xscale="log", xlabel=r"learning rate  $\eta$", ylabel="validation loss")
+    ax.legend()
     fig.tight_layout()
     return fig
