@@ -13,9 +13,9 @@ from .approaches import EnvelopeResult, IsoFlopResult, ParametricResult
 
 
 def set_style():
-    """Paper style: clean boxed axes with inward ticks, no grid, no titles, large
+    """Plot style of the paper: boxed axes with inward ticks, no grid, no titles, large
     axis labels, framed legends with qualitative entries only (no fitted numbers or
-    functional forms), and a plasma colormap for model size."""
+    functional forms), and the plasma colormap for model size."""
     plt.rcdefaults()
     plt.rcParams.update({
         "figure.dpi": 120, "savefig.dpi": 150, "savefig.bbox": "tight",
@@ -50,11 +50,12 @@ def _N_colormap(agg):
 
 
 def plot_all_runs(agg: pd.DataFrame, irreducible: float | None = None):
-    """One line per model size N, vs data D (left) and vs compute C (right).
+    """One line per model size N, against data D (left) and against compute C (right).
 
-    The data view shows each model's single-pass training curve (small models plateau
-    at their capacity, big ones keep descending); the compute view is the same data
-    re-indexed by C=6ND, whose lower envelope is the compute-optimal frontier.
+    The data view shows how each model's loss decreases with D (small models level off
+    at their capacity, large ones keep improving); the compute view shows the same
+    points against C = (6N - 2dw) D, where the lower envelope is the compute-optimal
+    frontier.
     """
     fig, axes = plt.subplots(1, 2, figsize=(13, 5))
     cmap, norm = _N_colormap(agg)
@@ -214,7 +215,7 @@ def plot_lr_ablation(df: pd.DataFrame, irreducible: float, n_hidden: int = 2):
 
     `df` has columns panel ('D'/'N'), x, width, tuned ('tuned'/'fixed'), val_loss.
     We plot the reducible (excess) loss L - E, averaged over seeds; the gap between
-    the per-cell-tuned curve and the single held-fixed LR is the tuning tax.
+    the per-cell-tuned curve and the single fixed LR is the cost of not re-tuning.
     """
     from .flops import mlp_param_count
     g = df.groupby(["panel", "x", "width", "tuned"]).val_loss.mean().reset_index()
@@ -238,7 +239,7 @@ def plot_lr_ablation(df: pd.DataFrame, irreducible: float, n_hidden: int = 2):
 
 
 def plot_hp_study(law: dict):
-    """HP-transfer study: optimal LR vs width (μP shift) and vs step budget (horizon)."""
+    """Learning-rate study: optimal LR against width and against step budget T."""
     w = np.array(law["widths"], float); eW = np.array(law["eta_width"], float)
     T = np.array(law["Tsteps"], float); eT = np.array(law["eta_T"], float)
     c_w, b_w = np.polyfit(np.log(w), np.log(eW), 1)
@@ -260,8 +261,8 @@ def plot_flop_validation(df: pd.DataFrame):
     """Closed-form training FLOPs/example vs a real FlopCounterMode measurement.
 
     `df` has columns N, measured, formula (=6N-2dw), naive (=6N). Left: the three
-    overlaid; right: their ratio to the measurement (the first-layer term is what
-    pulls 6N down to the truth, most at small N)."""
+    overlaid; right: the measurement divided by each formula (the first-layer term
+    brings 6N closer to the measurement, most at small N)."""
     fig, ax = plt.subplots(1, 2, figsize=(13, 5))
     ax[0].plot(df.N, df.measured, "o", color="crimson", ms=8, zorder=3,
                label="measured (FlopCounterMode)")
@@ -331,8 +332,9 @@ def plot_dd_epochs(df: pd.DataFrame, width: int, n_params: int, sigma: float = 0
     **one** shared log-loss axis. Test loss is against the *noisy* labels (excess + σ²),
     so it shares the σ² floor with train.
 
-    A star marks each curve's test minimum -- where an oracle early stop would land,
-    before the test risk climbs again (fitting the noise) and second-descends.
+    A star marks the test minimum of each curve, where an oracle early stop would end
+    training, before the test risk rises again (fitting the noise) and then descends a
+    second time.
     """
     s2 = sigma ** 2
     fig, ax = plt.subplots(figsize=(8, 5))
@@ -358,8 +360,9 @@ def plot_dd_epochs(df: pd.DataFrame, width: int, n_params: int, sigma: float = 0
 def plot_dd_phase(df: pd.DataFrame, sigma: float = 0.4, n_hidden: int = 2, input_dim: int = 32):
     """2D double-descent phase diagram (repeated-data regime): final test loss (left) and
     train MSE (right) over the model-size x dataset-size grid. Test loss is against the
-    *noisy* labels (excess + σ²). The bright test ridge tracks the interpolation threshold
-    N ~ D (dashed), where train error collapses to zero -- the Nakkiran et al. picture."""
+    *noisy* labels (excess + σ²). The bright ridge in the test loss follows the
+    interpolation threshold N ~ D (dashed), where the training error drops to zero, as in
+    Nakkiran et al. (2019)."""
     from .flops import mlp_param_count
     Ws = sorted(df["W"].unique()); Ds = sorted(df["D"].unique())
     test = df.pivot(index="D", columns="W", values="excess").reindex(index=Ds, columns=Ws).values + sigma ** 2
@@ -386,22 +389,23 @@ def plot_dd_phase(df: pd.DataFrame, sigma: float = 0.4, n_hidden: int = 2, input
 
 def plot_frontier_regimes(env: EnvelopeResult, par: ParametricResult,
                           irreducible: float | None = None):
-    """Anatomy of the compute-optimal frontier L*(C): three regimes, and why a single
-    fit to L(C) is unreliable.
+    """The compute-optimal frontier L*(C): its three regimes, and why a single fit to
+    L(C) is unreliable.
 
-    On the lower-envelope L*(C) we overlay four fits, each in a fixed compute window
-    (shaded), with dashed continuations past the last data point:
-      * fast descent (orange, C<1e9) -- an E=0 power law. Here L >> E, so it reads the
-        *true* (steep) reducible exponent.
-      * scaling (blue, 1e9-1e13)     -- an E=0 power law whose *apparent* exponent is
-        already shallower; the floor is starting to bite.
-      * saturation tail (red, C>=5e12) -- a free-E fit E + A*C^g; only this near-floor
-        window lets the free E land on the true irreducible loss.
-      * Approach 3 (green) -- the parametric L(N,D) projected to the frontier. It tracks
-        all three regimes here, but that is the easy case (clean task, known floor).
+    On the lower envelope L*(C) we overlay fits in fixed compute windows (shaded), each
+    continued as a dashed line outside its window:
+      * fast descent (orange, C < 1e9): a power law with E = 0. Here L >> E, so it
+        measures the steep reducible exponent.
+      * scaling (blue, 1e9-1e13): a power law with E = 0 whose apparent exponent is
+        already shallower, because the floor starts to matter.
+      * saturation (red, C >= 5e12): E + A*C^g with free E; only in this window close to
+        the floor does the fitted E land on the true irreducible loss.
+      * Approach 3 (green): the parametric L(N, D) projected onto the frontier. With a
+        single power law per variable it cannot follow all three regimes and misses
+        the envelope in the scaling regime.
 
-    Extrapolated (dashed), the E=0 laws shoot through the floor and the windowed
-    exponents disagree ~3x -- the point of the figure.
+    Extrapolated, the E = 0 power laws cross the floor, and the exponents fitted in the
+    different windows disagree by about 3x.
     """
     from scipy.optimize import curve_fit
     fr = env.frontier.sort_values("C")
@@ -455,8 +459,8 @@ def plot_frontier_regimes(env: EnvelopeResult, par: ParametricResult,
 
 
 def plot_lr_tuning(lrs, losses, eta_star):
-    """L1 figure: validation loss vs learning rate at one cell, with the parabola fit
-    (in log10(LR)) and its vertex eta*."""
+    """Layer-1 figure: validation loss vs learning rate at one cell, with the parabola
+    fit (in log10(LR)) and its vertex eta*."""
     lrs = np.asarray(lrs, dtype=float)
     x = np.log10(lrs)
     a, b, c = np.polyfit(x, losses, 2)

@@ -1,17 +1,21 @@
 #!/usr/bin/env python
-"""Three flavours of double descent in the repeated-data / overfitting regime.
+"""Double descent in the repeated-data regime.
 
-The main tutorial is single-pass (data never repeats), so it never overfits and the
-loss is monotone. Here we do the opposite (Nakkiran et al. 2019): fix a dataset, repeat it
-to interpolation, with extra label noise (sigma=0.4), and watch generalisation.
+The main tutorial is single-pass (data is never repeated), so it never overfits and the
+loss decreases monotonically. Here we do the opposite, following Nakkiran et al. (2019):
+fix a dataset, train on it repeatedly until the model interpolates it, with more label
+noise (sigma=0.4), and measure the test loss.
 
-  --mode samples : vary dataset size D at fixed width   -> peak at D ~ N      (sample-wise)
-  --mode width   : vary width W at fixed dataset D       -> peak at N ~ D      (model-wise)
-  --mode epochs  : fix W and D (overparam), train long   -> test goes down-up-down (epoch-wise)
+  --mode samples : vary dataset size D at fixed width    -> peak at D ~ N    (sample-wise)
+  --mode width   : vary width W at fixed dataset size D  -> peak at N ~ D    (model-wise)
+  --mode epochs  : fix W and D (overparameterized), train long
+                                                         -> test loss down-up-down (epoch-wise)
+  --mode grid    : sweep W and D together                -> 2D phase diagram
 
-Test error is the *excess risk* (MSE to the clean teacher on held-out inputs); train MSE
-is logged too (for width it shows the interpolation transition; for epochs it is half the
-story). Writes results/double_descent_<mode>.{csv,png}.
+The CSVs store the test excess risk (MSE to the clean teacher on held-out inputs) and the
+train MSE; the plots add sigma^2 to the excess risk so that test and train losses share
+the same floor. Writes results/double_descent_<mode>.csv and the figure to
+results/figures/.
 """
 from __future__ import annotations
 
@@ -57,9 +61,9 @@ def train_final(prob, width, D, sigma, seed, max_steps, batch, lr, eps=1e-3):
     """Train to interpolation; return (final excess, early-stopped excess, train MSE, steps).
 
     The early-stopped excess is the *minimum* test risk seen over training (an oracle
-    early stop, evaluated once per epoch). Comparing it to the final risk shows how much
-    of the double-descent peak is an artefact of training all the way to interpolation --
-    early stopping is the simplest regulariser that removes it.
+    early stop, evaluated once per epoch). Comparing it with the final risk shows how
+    much of the double-descent peak comes from training all the way to interpolation;
+    early stopping is the simplest regularizer that removes it.
     """
     X, y = fixed_dataset(prob, D, sigma, seed)
     torch.manual_seed(seed)
@@ -85,8 +89,9 @@ def train_final(prob, width, D, sigma, seed, max_steps, batch, lr, eps=1e-3):
 def train_trajectory(prob, width, D, sigma, seed, max_steps, batch, lr, n_logs=240):
     """Train long (no early stop); log (step, train, excess) at LOG-spaced steps.
 
-    Log-spaced (dense early) because the initial descent -- the model fitting the
-    teacher signal -- happens in the first few hundred steps; uniform logging misses it.
+    Log-spaced (dense at the start) because the initial descent, where the model fits
+    the teacher signal, happens in the first few hundred steps and uniform logging would
+    miss it.
     """
     X, y = fixed_dataset(prob, D, sigma, seed)
     torch.manual_seed(seed)

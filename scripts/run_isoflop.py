@@ -1,16 +1,17 @@
 #!/usr/bin/env python
-"""Dedicated IsoFLOP runs: actually train models at a shared compute C = 6ND.
+"""Dedicated IsoFLOP runs: train models at a shared compute budget C.
 
-Elsewhere Approach 2 reconstructs iso-compute slices by interpolating the rectangular
-(N, D) grid. This trains, for a set of compute budgets C and each depth family
-(L = 1/2/4/6), *real* models at (N, D = C/6N) -- genuine runs at the same compute.
-Each is tagged with iso_C = C and appended to that depth's CSV; aggregate() carries
-iso_C and Approach 2 then uses these runs directly. They are ordinary (N, D) cells,
-so they also enrich the default overview / envelope / parametric plots.
+Elsewhere, Approach 2 reconstructs iso-compute slices by interpolating the rectangular
+(N, D) grid. This script instead trains, for a set of compute budgets C and each depth
+family (L = 1/2/4/6), actual models at (N, D = C/k(N)), where k = 6N - 2dw is the
+training cost per example, so that all runs of a slice use the same compute. Each run is
+tagged with iso_C = C and appended to that depth's CSV; aggregate() keeps iso_C, and
+Approach 2 then uses these runs directly. They are also ordinary (N, D) cells, so they
+appear in the overview, envelope and parametric plots as well.
 
-Resumable: skips cells already in the CSV, and regenerates the depth figures at the end.
-Writes the per-depth CSVs and figures under --outdir (default ./results); run from the
-repo root.
+Resumable: cells already in the CSV are skipped, and the depth figures are regenerated
+at the end. Writes the per-depth CSVs and figures under --outdir (default ./results);
+run from the repo root.
 """
 import argparse
 import subprocess

@@ -1,145 +1,194 @@
 # Extracting neural scaling laws in three ways
 
-A small, self-contained tutorial that reproduces the **three compute-optimal
-scaling-law extraction methods** from the Chinchilla paper ([Hoffmann et al.,
-2022](https://arxiv.org/abs/2203.15556)) on a synthetic problem you can run on a laptop: MLP
-**students of increasing size** trained on a **Gaussian teacher-student** task.
+This repository is the companion tutorial to Section 4 of the paper
 
-A scaling law predicts how the achievable loss falls with compute[FLOPs] and how to split that compute between model size `N` (parameters) and
-data `D` (examples). We count MLP compute cost as **`C = (6N − 2·d·w)·D`** (`d` = input
-dim, `w` = first hidden width). This repo trains a grid over `(N, D)` and recovers the
-compute-optimal frontier `L*(C)` and allocation `(N*(C), D*(C))` in three ways.
+> M. Vigl, N. Pond, J. Barr, A. Froch, D. Guest, N. Hartman, M. Kagan, L. Heinrich,
+> *How to scale your HEP ML models: A recipe for robust architecture comparisons at scale*,
+> [arXiv:2610.06784](https://arxiv.org/abs/2610.06784) (2026).
 
-| # | method | idea | what it gives |
-|---|--------|------|---------------|
-| 1 | **Training-curve envelope** | lower envelope of the loss-vs-compute curves | assumption-free `L*(C)`, `N*`, `D*` |
-| 2 | **IsoFLOP profiles** | at fixed `C`, sweep `N`; the loss-minimising `N` is `N*(C)` | `N*`, `D*` from parabola minima |
-| 3 | **Parametric fit** | fit `L(N,D) = E + A/Nᵅ + B/Dᵝ`, frontier in closed form | full surface + floor `E` |
+It goes through the paper's teacher-student study step by step, on a problem small
+enough to run on a laptop: MLP students of increasing size are trained to
+imitate a fixed, randomly initialized MLP teacher on Gaussian inputs. From a grid of
+training runs over model size `N` and dataset size `D`, it extracts the compute-optimal
+scaling law with the three methods of the Chinchilla paper
+([Hoffmann et al., 2022](https://arxiv.org/abs/2203.15556)).
 
-## The notebooks, built up in layers
+## Differences from the paper
 
-A scaling analysis is really a stack of nested loops. The notebooks peel it from the inside out,
-each one wrapping the previous:
+The tutorial follows the paper's recipe but simplifies the hyperparameter tuning:
 
-| notebook | layer | what it adds | runs |
+- **Only the learning rate is tuned.** The paper predicts the joint optimum of learning
+  rate and batch size, `(η*, b*)`. Here the batch size is fixed at `b = 256` and only `η`
+  is tuned.
+- **No μP.** The paper uses a μP-based parameterization (Complete(d)P) under which the
+  optimal learning rate does not depend on the width or depth of the model. Here `η*` shifts
+  with width and depth, and we fit this dependence as a power law.
+
+
+## What is computed
+
+A scaling law describes how the best achievable loss decreases with training compute `C`
+(in FLOPs), and how that compute should be split between model size `N` (parameters) and
+data `D` (training examples). We count the training cost of an MLP as
+**`C = (6N − 2·d·w)·D`**, where `d` is the input dimension and `w` the width of the first
+hidden layer. From the `(N, D)` grid we extract the compute-optimal frontier `L*(C)` and
+the allocation `(N*(C), D*(C))` in three ways:
+
+| # | method | idea | output |
+|---|--------|------|--------|
+| 1 | **Training-curve envelope** | lower envelope of the loss-vs-compute curves | `L*(C)`, `N*`, `D*`, without assuming a functional form |
+| 2 | **IsoFLOP profiles** | at fixed `C`, sweep `N`; the `N` with the lowest loss is `N*(C)` | `N*`, `D*` from parabola minima |
+| 3 | **Parametric fit** | fit `L(N,D) = E + A/Nᵅ + B/Dᵝ` and derive the frontier in closed form | the full surface and the floor `E` |
+
+## Notebooks
+
+A scaling study is a set of nested loops: train one model, tune its learning rate, predict
+the learning rate for every model, train the grid, and fit the frontier. Each notebook adds
+one of these loops around the previous one:
+
+| notebook | step | what it does | runs |
 |---|---|---|---|
-| [`00_single_cell`](notebooks/00_single_cell.ipynb) | a single cell | train one model of size `N` on `D` examples → one loss | live |
-| [`01_tune_one_cell`](notebooks/01_tune_one_cell.ipynb) | tune one cell | sweep the LR, fit a parabola → the cell's optimum `η*` | live |
-| [`02_hp_transfer_law`](notebooks/02_hp_transfer_law.ipynb) | the HP law | how `η*` scales: `η*(w,T) = η_ref·(w/w_ref)^cᵂ·(T/T_ref)^cᵀ` | loads study |
-| [`03_scaling_analysis`](notebooks/03_scaling_analysis.ipynb) | the full sweep | the `(N,D)` grid (LR per cell from the law) → the frontier, three ways | loads grid |
-| [`04_double_descent`](notebooks/04_double_descent.ipynb) | a different regime | repeat a *limited* dataset → double descent | loads grids |
+| [`00_single_cell`](notebooks/00_single_cell.ipynb) | one cell | train one model of size `N` on `D` examples and record its loss | live |
+| [`01_tune_one_cell`](notebooks/01_tune_one_cell.ipynb) | tune one cell | sweep the learning rate and fit a parabola to find the cell's optimum `η*` | live |
+| [`02_hp_transfer_law`](notebooks/02_hp_transfer_law.ipynb) | learning-rate law | fit how `η*` changes with width and step count: `η*(w,T) = η_ref·(w/w_ref)^cᵂ·(T/T_ref)^cᵀ` | small live version, then loads the full study |
+| [`03_scaling_analysis`](notebooks/03_scaling_analysis.ipynb) | full sweep | train the `(N,D)` grid with the learning rate from the law and extract the frontier in three ways | loads the grid |
+| [`04_double_descent`](notebooks/04_double_descent.ipynb) | repeated data | train repeatedly on a small dataset instead of streaming fresh data, which produces double descent | loads the grids |
 
-The two cheap layers run live; the rest load grids precomputed by the scripts. The loops
-themselves live in the package: `sweep.run_cell` (L0), `hp.tune_lr_cell` (L1),
-`hp.fit_transfer_law` (L2), `sweep.run_grid` (L3), `approaches.*` (L4).
+The live parts train small models in a few minutes on a CPU; everything else is loaded from
+results produced by the scripts in [`scripts/`](scripts/). Each loop is a function in the
+package: `sweep.run_cell` (one cell), `hp.tune_lr_cell` (learning-rate sweep),
+`hp.fit_transfer_law` (learning-rate law), `sweep.run_grid` (grid) and `approaches.*`
+(frontier fits).
 
-## Why per-cell tuning matters
+## Why every cell needs its own learning rate
 
-A scaling law is only trustworthy if every cell is trained near its own optimal learning rate.
-[`run_lr_ablation.py`](scripts/run_lr_ablation.py) makes the cost of *not* re-tuning concrete:
-hold one fixed LR and scale either the data (left) or the model (right), against the
-fully per-cell-tuned baseline.
+A scaling law can only be trusted if every cell of the grid is trained close to its own
+optimal learning rate. [`run_lr_ablation.py`](scripts/run_lr_ablation.py) keeps one learning rate fixed while scaling either the data (left) or
+the model (right), and compares with cells trained at their own predicted `η*`.
 
 ![lr ablation](results/figures/lr_ablation.png)
 
-The fixed-LR loss stops improving and eventually turns **up**, while the tuned curve keeps
-descending; the gap grows with scale. So reading a scaling exponent off an un-tuned grid biases
-it, and can hide the scaling entirely. That is why this is its own layer: notebook 02 calibrates
-the transfer law `η*(w,T)`, and notebook 03 launches every grid cell at its predicted `η*`.
+With the fixed learning rate the loss stops improving and eventually increases, while the
+tuned runs keep improving. The gap grows with scale, so an exponent read off an untuned
+grid is biased, and the scaling can disappear entirely. Notebook 02 therefore calibrates
+the law `η*(w,T)` first, and notebook 03 trains every cell at its predicted `η*`.
 
-The same holds for **every** hyperparameter, not just the learning rate: the batch size, warmup fraction, and schedule shape all have optima that drift with model and data size, so
-a fully rigorous study would tune and scale them jointly. We calibrate the learning rate (the most
-impactful one) and hold the rest fixed for simplicity.
+The same applies in principle to the other hyperparameters, whose optima also move with
+model and data size.
 
 ## The synthetic problem
 
-- **Teacher**: a *fixed, randomly initialised* MLP that **defines the target
-  function** (never trained). Inputs are Gaussian `x ~ N(0, I)`.
-- **Student**: the MLP we **train**, of growing width (size `N`), to imitate the
-  teacher.
-- **Targets**: `y = teacher(x) + σ·ε`, label noise `ε ~ N(0,1)`. Data is drawn
-  **fresh every step** (single-pass), so `D` = examples seen.
+- **Teacher**: a fixed, randomly initialized MLP (width 256, two hidden layers) that
+  defines the target function. It is never trained. Inputs are Gaussian, `x ~ N(0, I)`, in
+  `d = 32` dimensions.
+- **Student**: the MLP we train to imitate the teacher. Its width, and therefore `N`, is
+  varied.
+- **Targets**: `y = teacher(x) + σ·ε` with label noise `ε ~ N(0,1)` and `σ = 0.1`. Fresh
+  data is drawn at every step, so every example is seen once and `D` is the number of
+  examples seen.
 
-Under the Loss parametric form `L ≈ E + A/Nᵅ + B/Dᵝ`:
+In the parametric form `L ≈ E + A/Nᵅ + B/Dᵝ`, the three terms have a direct interpretation:
 
 - `A/Nᵅ`: a small student cannot represent the teacher (capacity error),
-- `B/Dᵝ`: too few examples to pin the function down (data error),
-- `E`: label noise no model can predict.
+- `B/Dᵝ`: too few examples to determine the function (data error),
+- `E`: the label noise, which no model can predict.
 
-Because the task is synthetic we **know the floor exactly**: `E = σ²`. That lets us
-grade the fitted floor from Approach 3 against the truth.
+Because the task is synthetic, the floor is known exactly, `E = σ² = 0.01`, and the floor
+fitted by Approach 3 can be checked against it.
 
 ## Quickstart
 
-Install, then read the notebooks in order, starting at `00` and working up (see the table above):
+Install the package, then open the notebooks in order, starting with `00`:
 
 ```bash
 pip install -e ".[notebook]"        # editable install + jupyter
-jupyter notebook notebooks/         # open 00_single_cell.ipynb and go layer by layer
+jupyter notebook notebooks/         # start with 00_single_cell.ipynb
 ```
 
 Or with [pixi](https://pixi.sh):
 
 ```bash
-pixi install          # build the env from pyproject.toml
+pixi install          # build the environment from pyproject.toml
 pixi run notebooks    # execute all five notebooks (00 -> 04)
 ```
 
 <details>
-<summary><b>Optional: regenerate the data from scratch</b> (only to reproduce the sweeps)</summary>
+<summary><b>Optional: regenerate the data</b></summary>
 
 ```bash
-# 1) Calibrate the per-cell learning rate (the muP / transfer study, ~10 min CPU).
-#    Writes results/hp_study_cosine.json + results/figures/hp_study_cosine.png
+# 1) Calibrate the learning-rate law eta*(w, T) (~10 min on a CPU).
+#    Writes results/hp_study_cosine.json and results/figures/hp_study_cosine.png
 python scripts/run_hp_study.py
 
-# 2) Train the (N, D) grid with each cell at its own tuned LR (~45 min CPU; the
-#    default grid runs out to 17M examples). Incremental: re-running after
-#    extending the data/width range only trains the new cells.
+# 2) Train the (N, D) grid, each cell at its predicted learning rate (~45 min on a CPU,
+#    up to D = 17M examples). Cells already in the CSV are skipped, so extending the
+#    width or data range only trains the new cells.
 #    Writes results/sweep_cosine.csv, results/sweep_meta.json, results/teacher.pt
-python scripts/run_sweep.py                 # or: --preset quick   for a fast smoke test
+python scripts/run_sweep.py                 # or --preset quick for a short test run
+
+# 3) Dedicated IsoFLOP runs used by Approach 2 (for every depth family; appended to
+#    the sweep CSVs)
+python scripts/run_isoflop.py
 ```
 </details>
 
-The split is deliberate: **sweeps run in scripts, visualisation lives in the
-notebook.** Re-rendering the notebook is fast and deterministic because it just
-reloads the cached CSVs.
+The expensive training runs live in the scripts, and the analysis notebooks only load
+their cached CSVs, so re-running the analysis is fast and deterministic.
 
-## Scaling Laws
+## Results
 
 ![overview](results/figures/01_overview.png)
 
-*Loss vs compute, one curve per model size: small models win at low compute,
-large models take over and approach the known floor `E = σ²`.*
+*Loss against compute, one curve per model size. Small models are best at low compute;
+larger models take over as compute grows and approach the known floor `E = σ²`.*
 
 | Approach 1: envelope | Approach 2: IsoFLOP | Approach 3: parametric |
 |:---:|:---:|:---:|
 | ![a1](results/figures/02_approach1_envelope.png) | ![a2](results/figures/03_approach2_isoflop.png) | ![a3](results/figures/04_approach3_parametric.png) |
 
-All three recover near-`√C` scaling (`N*` and `D*` grow together) and broadly
-agree on the allocation; Approach 3 additionally recovers the known floor `E`.
+All three approaches find close to `√C` scaling, with `N*` and `D*` growing at about the
+same rate (`N* ∝ C^a` with `a` between 0.42 and 0.56). Approach 3 also estimates the floor,
+`E = 0.011`, about 10% above the true value of 0.01.
 
 ### Double descent
 
-The tutorial above is single-pass, so it never overfits and the loss is monotone.
-A second notebook reproduces all three classic double descents
-([Nakkiran et al., 2019](https://arxiv.org/abs/1912.02292)) on the same teacher-student setup:
+The main tutorial streams fresh data, so no example is repeated, the model never overfits,
+and the loss decreases monotonically. Notebook 04 instead trains repeatedly on a fixed
+dataset with more label noise (`σ = 0.4`) and reproduces the three kinds of double descent
+of [Nakkiran et al., 2019](https://arxiv.org/abs/1912.02292) on the same teacher:
 
-- **Sample-wise** (`--mode samples`, vary `D`): test loss peaks near the
-  interpolation threshold `D ~ N`, then second-descends.
-- **Model-wise** (`--mode width`, vary `W` at fixed `D=10k`): classic U, a sharp peak
-  **exactly at `N ~ D`**, then a second descent.
-- **Epoch-wise** (`--mode epochs`, fixed `W,D` overparam, train long): test goes
-  down (fit signal) → up (fit noise) → down (second descent), while train MSE falls
-  monotonically to interpolation.
+- **Sample-wise** (`--mode samples`, vary `D` at fixed width): the test loss peaks near the
+  interpolation threshold `D ≈ N` and then decreases again.
+- **Model-wise** (`--mode width`, vary the width at fixed `D = 10k`): a U-shaped curve, a
+  sharp peak at `N ≈ D`, and a second descent.
+- **Epoch-wise** (`--mode epochs`, fixed overparameterized `W` and `D`, long training): the
+  test loss decreases (fitting the signal), increases (fitting the noise) and decreases
+  again, while the training MSE decreases monotonically until the model interpolates the
+  data.
 
 | sample-wise | model-wise | epoch-wise |
 |:---:|:---:|:---:|
 | ![](results/figures/double_descent_samples.png) | ![](results/figures/double_descent_width.png) | ![](results/figures/double_descent_epochs.png) |
 
+`--mode grid` sweeps `N` and `D` together. The sample-wise and model-wise curves are cuts
+through the resulting phase diagram:
 
 ![phase diagram](results/figures/double_descent_phase.png)
 
+## Citation
+
+If you use this code, please cite the paper:
+
+```bibtex
+@misc{vigl2026scale,
+  title         = {How to scale your {HEP} {ML} models: A recipe for robust architecture comparisons at scale},
+  author        = {Vigl, Matthias and Pond, Nikita and Barr, Jackson and Froch, Alexander and Guest, Dan and Hartman, Nicole and Kagan, Michael and Heinrich, Lukas},
+  year          = {2026},
+  eprint        = {2610.06784},
+  archivePrefix = {arXiv},
+  primaryClass  = {hep-ex}
+}
+```
 
 ## References
 

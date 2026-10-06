@@ -1,17 +1,18 @@
 #!/usr/bin/env python
-"""What re-tuning the learning rate buys, along D and along N (depth L=2).
+"""What re-tuning the learning rate gains, along D and along N (depth L=2).
 
-Both panels compare a single *fixed* LR against the fully per-cell-tuned baseline
-eta*(w, T) (the transfer law run_sweep.py uses). The fixed LR is the one optimal at
-the small end of the swept axis, then held constant:
+Both panels compare a single fixed LR with the per-cell-tuned baseline eta*(w, T) (the
+transfer law used by run_sweep.py). The fixed LR is the one that is optimal at the small
+end of the swept axis, held constant along it:
 
-  * left  -- fixed architecture (w=64), grow D. eta* falls with the step budget, so an
-             LR tuned at the smallest D is too hot once D is large.
-  * right -- fixed D, grow width N. eta* falls with width (the muP shift), so an LR
-             tuned at the smallest width is too hot once the model is wide.
+  * left:  fixed architecture (w=64), increasing D. eta* decreases with the step
+           budget, so an LR tuned at the smallest D is too large once D is large.
+  * right: fixed D, increasing width N. eta* decreases with width (in the standard
+           parameterization used here), so an LR tuned at the smallest width is too
+           large once the model is wide.
 
-The gap between the curves is the loss left on the table by not re-tuning -- the bias
-that hyperparameter transfer removes. Writes results/lr_ablation.csv.
+The gap between the curves is the loss given up by not re-tuning, i.e. the bias that
+the per-cell LR law removes. Writes results/lr_ablation.csv.
 """
 from __future__ import annotations
 

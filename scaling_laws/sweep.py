@@ -1,11 +1,11 @@
-"""Run the (N, D) grid that feeds all three scaling-law approaches.
+"""Run the (N, D) grid that all three scaling-law approaches are fitted to.
 
-Each *cell* is one single-pass training run of a model of size N on D fresh
-examples, annealed with its own cosine schedule. We record the final validation
-loss. From the resulting table of (N, D, loss) every approach is derived:
+Each cell is one single-pass training run of a model of size N on D fresh examples,
+with its own cosine schedule, and we record the final validation loss. All three
+approaches work from the resulting (N, D, loss) table:
 
-* Approach 1 reads the lower envelope of the per-N loss-vs-compute curves.
-* Approach 2 reads the loss-minimising N along iso-compute (C = 6ND) slices.
+* Approach 1 takes the lower envelope of the per-N loss-vs-compute curves.
+* Approach 2 finds the loss-minimizing N along iso-compute slices, C = (6N - 2dw) D.
 * Approach 3 fits L(N, D) = E + A/N^a + B/D^b to the whole table.
 """
 from __future__ import annotations
@@ -23,7 +23,7 @@ from .data import TeacherStudentRegression
 from .flops import compute
 from .models import LitMLP
 
-# Keep the sweep quiet -- hundreds of tiny runs.
+# The sweep launches hundreds of small runs, so silence Lightning's per-run output.
 logging.getLogger("lightning.pytorch").setLevel(logging.ERROR)
 logging.getLogger("lightning.pytorch.utilities.rank_zero").setLevel(logging.ERROR)
 logging.getLogger("lightning.fabric.utilities.seed").setLevel(logging.ERROR)
@@ -34,13 +34,14 @@ warnings.filterwarnings("ignore", ".*LeafSpec.*")            # lightning pytree 
 
 def transfer_lr(eta_ref: float, w_ref: float, T_ref: float, c_w: float, c_T: float,
                 T_min: int = 256, lr_max: float = 0.05, lr_min: float = 3e-4):
-    """A per-cell learning-rate rule eta*(width, steps) from the HP-transfer study.
+    """Per-cell learning-rate rule eta*(width, steps) from the fitted transfer law.
 
     eta* = eta_ref * (width/w_ref)**c_w * (T_eff/T_ref)**c_T, with T_eff = max(T, T_min)
-    so the (steep) T-law is not extrapolated into the warmup-dominated few-step regime,
-    and the result clamped to [lr_min, lr_max] for stability. This is a miniature
-    analogue of muP-style hyperparameter transfer: every grid
-    cell is launched at its own optimum instead of one shared LR.
+    so that the steep T-law is not extrapolated into the few-step regime dominated by the
+    warmup, and the result is clamped to [lr_min, lr_max] for stability. In the standard
+    parameterization used here eta* depends on the width, so the law fits that dependence
+    (the paper removes it with a muP-type parameterization instead). Every grid cell is
+    then trained at its own predicted optimum rather than at one shared LR.
     """
     def rule(width: int, steps: int) -> float:
         T_eff = max(steps, T_min)
@@ -88,7 +89,7 @@ def run_grid(problem: TeacherStudentRegression, widths, n_data_list, *,
 
     Caching is *incremental*: cells already present in ``cache_path`` (matched on
     seed/width/D) are kept and skipped, so extending ``widths`` or ``n_data_list``
-    only trains the genuinely new cells. ``force=True`` recomputes.
+    only trains the new cells. ``force=True`` recomputes everything.
     """
     records, done = [], set()
     if cache_path and os.path.exists(cache_path) and not force:

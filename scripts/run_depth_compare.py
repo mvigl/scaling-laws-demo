@@ -1,24 +1,24 @@
 #!/usr/bin/env python
-"""Depth study: scale N by adding layers, and compare against the width-only sweep.
+"""Depth study: increase N by adding layers, and compare with the width-only sweep.
 
-Trains student families at depths 1 and 6 (vs the default 2 hidden layers) on the
-*same* teacher and compares the scaling law at fixed depth and combined (N grown via
-width and depth). Each family mirrors the L=2 sweep's coverage: every width L=2 has,
-on exactly the data budgets that L=2 width saw (non-rectangular -- L=2's densified
-small widths only went to 2^21).
+Trains student families with 1 and 6 hidden layers by default (4 on request; the main
+sweep uses 2) on the same teacher, and compares their scaling at fixed depth and
+combined (N increased through both width and depth). Each family uses the same
+(width, D) cells as the L=2 sweep, which is not rectangular: the extra small widths of
+L=2 only go up to D = 2^21.
 
-The optimal LR shifts with depth, so each family
-gets its own calibration. Probes (run_cell LR sweeps at w=16/64/128, T=2048) found,
-relative to L=2's eta_ref=0.00535 at (w=64, T=2048):
-    L=1: eta_ref ~ 0.0057  (~1.2x L=2 -- the depth->LR effect saturates when shallow)
-    L=6: eta_ref ~ 0.0017  (~0.3x L=2 -- steep; plain MLPs lack residual rescaling)
-Width and T exponents are depth-independent, so only the reference shifts.
+The optimal LR changes with depth, so each family has its own calibration. LR probes
+(run_cell LR sweeps at w=16/64/128, T=2048) gave, relative to L=2's eta_ref=0.00535 at
+(w=64, T=2048):
+    L=1: eta_ref ~ 0.0057  (~1.1x L=2; the depth dependence flattens out for shallow nets)
+    L=6: eta_ref ~ 0.0017  (~0.3x L=2; much steeper, plain MLPs have no residual rescaling)
+The width and T exponents do not depend on depth, so only the reference value changes.
 
 Usage:
-    python scripts/run_depth_compare.py --dry-run        # preview cells + cost, no training
+    python scripts/run_depth_compare.py --dry-run        # list new cells and estimated cost, no training
     python scripts/run_depth_compare.py --depths 1       # train only L=1 (cheap), then plot
     python scripts/run_depth_compare.py                  # train L=1 and L=6, then plot
-    python scripts/run_depth_compare.py --plot-only      # just (re)make the figures
+    python scripts/run_depth_compare.py --plot-only      # only remake the figures
 """
 from __future__ import annotations
 

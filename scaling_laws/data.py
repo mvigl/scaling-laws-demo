@@ -1,21 +1,21 @@
-"""Synthetic Gaussian teacher-student *regression* problem.
+"""Synthetic Gaussian teacher-student regression problem.
 
-Inputs are standard Gaussian, x ~ N(0, I_d). The target is produced by a *fixed,
-frozen* network -- the "teacher" -- plus i.i.d. label noise:
+Inputs are standard Gaussian, x ~ N(0, I_d). The target is the output of a fixed
+network, the "teacher", plus i.i.d. label noise:
 
     y = f_teacher(x) + sigma * eps,    eps ~ N(0, 1).
 
-The teacher is never trained; it only defines the ground-truth function we want to
-learn (a fixed, reproducible, seeded network whose weights are saved to disk). The
-student is the MLP we train, of growing size N.
+The teacher is a randomly initialized, seeded MLP that is never trained; it only
+defines the function to be learned (its weights can be saved to disk). The student is
+the MLP we train, with increasing size N.
 
-Two knobs make a clean scaling law appear:
-* the teacher is larger than at a fraction of the trained students, so smaller students have real
-  approximation error -> the A/N^alpha term;
-* data is drawn fresh every step (single pass) -> the B/D^beta term.
-The label noise sets the KNOWN irreducible floor E = sigma^2 (the Bayes-optimal
-predictor is f_teacher, leaving expected MSE = sigma^2). Targets are normalised to
-unit variance so the loss scale is interpretable (init ~ 1 + sigma^2, floor ~ sigma^2).
+Two choices give the loss its additive form:
+* the teacher is wider than the smaller students, so those have a real approximation
+  error -> the A/N^alpha term;
+* fresh data is drawn at every step (single pass) -> the B/D^beta term.
+The label noise sets a known irreducible floor E = sigma^2 (the best possible predictor
+is f_teacher, whose expected MSE is sigma^2). The teacher output is normalized to unit
+variance, so the loss starts near 1 + sigma^2 and cannot go below sigma^2.
 """
 from __future__ import annotations
 

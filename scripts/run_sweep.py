@@ -1,10 +1,11 @@
 #!/usr/bin/env python
 """Run the (N, D) scaling sweep and cache it to CSV.
 
-This is the *training* entry point. It trains a grid of MLP students of growing
-size N on growing single-pass data budgets D, each at its own tuned (cosine) LR, and
-writes the table plus a meta sidecar describing the problem. The notebook then loads
-the CSV and does all the analysis and plotting -- it never trains.
+This is the training entry point. It trains a grid of MLP students of increasing size
+N on increasing single-pass data budgets D, each at its own predicted LR, and writes the
+results together with a metadata file describing the problem.
+notebooks/03_scaling_analysis.ipynb loads the CSV for the analysis and plots; it does
+not train.
 
 Examples
 --------
@@ -23,10 +24,10 @@ from scaling_laws.data import TeacherStudentRegression  # noqa: E402
 from scaling_laws.sweep import run_grid, transfer_lr     # noqa: E402
 
 # --------------------------------------------------------------------------- #
-# Problem + grid configuration. The ground truth is a fixed, frozen teacher
-# network (weights saved to results/teacher.pt). A student >= teacher width hits
-# the irreducible floor E = sigma^2; smaller students stay capacity-limited, so
-# the loss falls smoothly with model size N.
+# Problem + grid configuration. The ground truth is a fixed teacher network
+# (weights saved to results/teacher.pt). A student at least as wide as the teacher
+# can reach the irreducible floor E = sigma^2; narrower students are limited by their
+# capacity, so the loss decreases smoothly with model size N.
 # --------------------------------------------------------------------------- #
 PROBLEM = dict(input_dim=32, teacher_width=256, teacher_depth=2, teacher_act="gelu",
                noise_std=0.1, val_size=16384, seed=0)
@@ -90,7 +91,7 @@ def main():
                 cosine_lr_law=COSINE_LR, preset=args.preset)
     (outdir / "sweep_meta.json").write_text(json.dumps(meta, indent=2))
 
-    print("\nDone. Visualise with notebooks/01_scaling_laws.ipynb")
+    print("\nDone. Analyze with notebooks/03_scaling_analysis.ipynb")
 
 
 if __name__ == "__main__":

@@ -1,15 +1,15 @@
-"""The three ways to extract the compute-optimal frontier from a (N, D) grid.
+"""Three ways to extract the compute-optimal frontier from an (N, D) grid.
 
-All three estimate, at each compute budget C = 6ND, the loss-minimising
-allocation (N*(C), D*(C)) and the frontier loss L*(C). They differ in cost and
-in what they are sensitive to:
+All three estimate, for each compute budget C, the loss-minimizing allocation
+(N*(C), D*(C)) and the frontier loss L*(C). They differ in cost and in what they are
+sensitive to:
 
-* approach 1 (``training_curve_envelope``): assumption-free, reads the lower
-  envelope of the loss-vs-compute curves.
+* approach 1 (``training_curve_envelope``): takes the lower envelope of the
+  loss-vs-compute curves, without assuming a functional form.
 * approach 2 (``isoflop_profiles``): fits a parabola in log N along iso-compute
-  slices and reads its minimum.
-* approach 3 (``parametric_fit``): fits the full additive surface
-  L = E + A/N^a + B/D^b and gets the frontier in closed form.
+  slices and takes its minimum.
+* approach 3 (``parametric_fit``): fits the additive surface
+  L = E + A/N^a + B/D^b and derives the frontier in closed form.
 """
 from __future__ import annotations
 
@@ -145,7 +145,7 @@ def _isoflop_from_runs(agg: pd.DataFrame, min_points: int) -> IsoFlopResult:
     """Approach 2 from *dedicated* iso-FLOP runs (rows tagged with their budget iso_C).
 
     The runner trains each cell at D = C/k(N), k = 6N-2dw (run_isoflop.py), so a slice
-    is a genuine iso-compute set at its tagged budget C."""
+    is an exact iso-compute set at its tagged budget C."""
     profiles, minima = {}, []
     for C, prof in agg[agg["iso_C"] > 0].groupby("iso_C"):
         prof = prof.sort_values("N").copy()

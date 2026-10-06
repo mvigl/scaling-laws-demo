@@ -1,14 +1,14 @@
 #!/usr/bin/env python
-"""Driver for the HP-transfer study: calibrate eta*(w, T) and cache it.
+"""Calibrate the learning-rate law eta*(w, T) and save it.
 
-A thin wrapper over ``scaling_laws.hp.fit_transfer_law``, which runs the inner LR sweeps
+A thin wrapper around ``scaling_laws.hp.fit_transfer_law``, which runs the LR sweeps
 (``scaling_laws.hp.tune_lr_cell``) and fits
 
     eta*(w, T) = eta_ref * (w/w_ref)^c_w * (T/T_ref)^c_T.
 
-Writes results/hp_study_cosine.json + figure; scripts/run_sweep.py reads the json to set
-the per-cell LR. The two notebooks 01_* (one cell) and 02_* (the law) walk through the
-same helpers interactively. Run from the repo root.
+Writes results/hp_study_cosine.json and a figure; the per-cell LR law in
+scripts/run_sweep.py (COSINE_LR) is taken from it. Notebooks 01_* (one cell) and 02_*
+(the law) go through the same functions interactively. Run from the repo root.
 """
 from __future__ import annotations
 

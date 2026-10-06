@@ -1,13 +1,14 @@
-"""Live training for the tutorial notebooks: transparent loops that print a progress
-bar and build a loss curve in real time, so the descent of cheap cells is visible.
+"""Training loops for the notebooks that show a progress bar and update the loss curve
+while the model trains, so that small cells can be followed live.
 
-All three helpers share ``sweep.run_cell``'s recipe (``make_mlp`` + AdamW + cosine-warmup
-schedule, single pass) -- the only difference is that the loop is spelled out so it can
-be watched.
+The helpers use the same setup as ``sweep.run_cell`` (``make_mlp``, AdamW, warmup plus
+cosine schedule, single pass); the loop is written out so that it can be plotted as it
+runs.
 
-* :func:`train_cell_live`  -- one cell, one live curve (notebook 00).
-* :func:`train_cells_live` -- a list of (width, D) cells, curves overlaid (notebook 00).
-* :func:`sweep_lr_live`    -- one cell at many LRs, curves coloured by LR (notebook 01).
+* :func:`train_cell_live`:  one cell, one live curve (notebook 00).
+* :func:`train_cells_live`: a list of (width, D) cells, curves overlaid (notebook 00).
+* :func:`sweep_lr_live`:    one cell at many LRs, curves colored by LR (notebook 01).
+* :func:`measure_law_live`: the learning-rate law on a few cells (notebook 02).
 """
 from __future__ import annotations
 
@@ -80,8 +81,8 @@ def train_cell_live(problem, width, n_data, lr, *, n_hidden=2, batch_size=256, s
 def train_cells_live(problem, cells, lr=0.005, *, n_hidden=2, batch_size=256, seed=0):
     """Train a list of cells, overlaying their training curves (one per cell, with a
     legend), and return run records for tabulation. Each cell is ``(width, n_data)`` or
-    ``(width, n_data, lr)`` -- the optional third entry overrides the default ``lr``. Used
-    by the cheap multi-cell grid in notebook 00."""
+    ``(width, n_data, lr)``; the optional third entry overrides the default ``lr``. Used
+    for the small multi-cell example in notebook 00."""
     import matplotlib.pyplot as plt
     from IPython.display import display
     from .flops import mlp_param_count, compute
@@ -113,11 +114,11 @@ def train_cells_live(problem, cells, lr=0.005, *, n_hidden=2, batch_size=256, se
 
 
 def sweep_lr_live(problem, width, n_data, lrs, *, n_hidden=2, batch_size=256, seed=0):
-    """L1 sweep, live: train the cell at each LR, building up the per-LR training curves
-    coloured by learning rate. Returns ``(eta_star, final_losses)``.
+    """Layer-1 sweep, live: train the cell at each LR and add its training curve to the
+    plot, colored by learning rate. Returns ``(eta_star, final_losses)``.
 
-    You watch the hottest rates go noisy and the coldest underfit, with the optimum
-    threading between. ``eta_star`` is the parabola vertex of final loss vs log10(LR).
+    The largest learning rates become noisy and the smallest underfit, with the optimum
+    in between. ``eta_star`` is the vertex of a parabola fitted to final loss vs log10(LR).
     """
     import matplotlib.pyplot as plt
     import matplotlib.cm as cm
@@ -152,11 +153,11 @@ def sweep_lr_live(problem, width, n_data, lrs, *, n_hidden=2, batch_size=256, se
 
 
 def measure_law_live(problem, *, widths, Tsteps, w_ref, T_ref, batch_size=256, lrs=None, seed=0):
-    """L2, live: measure eta* across a few widths and step budgets (each via tune_lr_cell),
-    building up the eta*-vs-width and eta*-vs-T points, then fit and overlay the two power
-    laws. Returns the fitted-law dict.
+    """Layer 2, live: measure eta* for a few widths and step budgets (each with
+    tune_lr_cell), plot the eta*-vs-width and eta*-vs-T points as they come in, then fit
+    and overlay the two power laws. Returns the fitted-law dict.
 
-    A cheap, illustrative version of ``scripts/run_hp_study.py`` -- the committed law in
+    A small version of ``scripts/run_hp_study.py``; the law in
     ``results/hp_study_cosine.json`` uses a denser grid and two seeds.
     """
     import matplotlib.pyplot as plt

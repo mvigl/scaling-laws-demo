@@ -1,9 +1,9 @@
 """The student model: a plain MLP wrapped as a ``LightningModule``.
 
-The training setup is standard practice at a miniature scale: AdamW, a linear warmup over 8% of
-steps from eta/100 -> eta, then cosine annealing eta -> eta/10. Every grid cell is a
-*single-pass* run annealed to its own data budget D -- the compute-bottlenecked regime.
-The loss is MSE (see data.py for why regression, not classification).
+Training uses AdamW with a linear warmup from eta/100 to eta over the first 8% of the
+steps, followed by cosine annealing from eta to eta/10 (the same schedule as in the
+paper). Every grid cell is a single-pass run annealed over its own data budget D. The
+loss is MSE.
 """
 from __future__ import annotations
 
