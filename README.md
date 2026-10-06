@@ -4,7 +4,7 @@ This repository is the companion tutorial to Section 4 of the paper
 
 > M. Vigl, N. Pond, J. Barr, A. Froch, D. Guest, N. Hartman, M. Kagan, L. Heinrich,
 > *How to scale your HEP ML models: A recipe for robust architecture comparisons at scale*,
-> [arXiv:2610.06784](https://arxiv.org/abs/2610.06784) (2026).
+> [arXiv:2610.06784](https://arxiv.org/pdf/2610.06784) (2026).
 
 It goes through the paper's teacher-student study step by step, on a problem small
 enough to run on a laptop: MLP students of increasing size are trained to
