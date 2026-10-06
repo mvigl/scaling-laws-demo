@@ -180,13 +180,14 @@ through the resulting phase diagram:
 If you use this code, please cite the paper:
 
 ```bibtex
-@misc{vigl2026scale,
-  title         = {How to scale your {HEP} {ML} models: A recipe for robust architecture comparisons at scale},
-  author        = {Vigl, Matthias and Pond, Nikita and Barr, Jackson and Froch, Alexander and Guest, Dan and Hartman, Nicole and Kagan, Michael and Heinrich, Lukas},
-  year          = {2026},
-  eprint        = {2610.06784},
-  archivePrefix = {arXiv},
-  primaryClass  = {hep-ex}
+@misc{vigl2026scalehepmlmodels,
+      title={How to scale your HEP ML models: A recipe for robust architecture comparisons at scale}, 
+      author={Matthias Vigl and Nikita Pond and Jackson Barr and Alexander Froch and Dan Guest and Nicole Hartman and Michael Kagan and Lukas Heinrich},
+      year={2026},
+      eprint={2610.06784},
+      archivePrefix={arXiv},
+      primaryClass={hep-ex},
+      url={https://arxiv.org/abs/2610.06784}, 
 }
 ```
 
